@@ -1,1 +1,2 @@
 # Interfacing-of-LCD-Display-and-HEX-Keyboard-with-FPGA-board-using-Verilog
+This project demonstrates the interfacing of an LCD display and a hexadecimal (HEX) keyboard with an FPGA board using Verilog HDL. It includes modules for reading and decoding input from the HEX keyboard, storing the data in a FIFO, and displaying the input on the LCD. The project highlights efficient communication and synchronization between peripherals, providing a comprehensive example of FPGA-based embedded system design.
