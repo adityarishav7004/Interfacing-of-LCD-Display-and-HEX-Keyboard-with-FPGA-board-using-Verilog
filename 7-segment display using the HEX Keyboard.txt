@@ -1,0 +1,174 @@
+//7-segment display using the HEX Keyboard design code
+module top(
+    input clk_100MHz,   // from Basys 3
+    input [3:0] rows,   // Pmod JB pins 10 to 7
+    output [3:0] cols,  // Pmod JB pins 4 to 1
+    output [3:0] an,    // 7 segment anodes
+    output [6:0] seg    // 7 segment cathodes
+    );
+
+	wire [3:0] w_dec;
+
+	decoder d(.clk_100MHz(clk_100MHz), .row(rows),
+			.col(cols), .dec_out(w_dec));
+
+	seg7_control s(.dec(w_dec), .an(an), .seg(seg));
+
+endmodule
+
+module decoder(
+    input clk_100MHz,
+    input [3:0] row,                      // 4 buttons per row
+    output reg [3:0] col,                 // 4 columns on keypad
+    output reg [3:0] dec_out              // binary value of button press
+    );
+
+    parameter LAG = 10;                   // 100MHz / 10 = 10M -> 1/10M = 100ns
+
+	reg [19:0] scan_timer = 0;            // to count up to 99,999
+	reg [1:0] col_select = 0;             // 2 bit counter to select 4 columns
+	
+	// scan timer/column select control
+	always @(posedge clk_100MHz)          // 1ms = 1/1000s
+		if(scan_timer == 99_999) begin    // 100MHz / 100,000 = 1000
+			scan_timer <= 0;
+			col_select <= col_select + 1;
+		end
+		else
+			scan_timer <= scan_timer + 1;
+
+    // set columns, check rows
+	always @(posedge clk_100MHz)
+		case(col_select)
+			2'b00 :	begin
+					   col = 4'b0111;
+					   if(scan_timer == LAG)
+						  case(row)
+						      4'b0111 :	dec_out = 4'b0001;	// 1
+						      4'b1011 :	dec_out = 4'b0100;	// 4
+						      4'b1101 :	dec_out = 4'b0111;	// 7
+						      4'b1110 :	dec_out = 4'b0000;	// 0
+						  endcase
+					end
+			2'b01 :	begin
+					   col = 4'b1011;
+					   if(scan_timer == LAG)
+						  case(row)    		
+						      4'b0111 :	dec_out = 4'b0010;	// 2	
+						      4'b1011 :	dec_out = 4'b0101;	// 5	
+						      4'b1101 :	dec_out = 4'b1000;	// 8	
+					              4'b1110 : dec_out = 4'b1111;	// F
+			                          endcase
+			                end 
+			2'b10 :	begin       
+					   col = 4'b1101;
+					   if(scan_timer == LAG)
+						  case(row)    		       
+						      4'b0111 :	dec_out = 4'b0011;	// 3 		
+						      4'b1011 :	dec_out = 4'b0110;	// 6 		
+						      4'b1101 :	dec_out = 4'b1001;	// 9 		
+						      4'b1110 : dec_out = 4'b1110;	// E	    
+						  endcase      
+					end
+			2'b11 :	begin
+					   col = 4'b1110;
+					   if(scan_timer == LAG)
+						  case(row)    
+						      4'b0111 :	dec_out = 4'b1010;	// A
+						      4'b1011 :	dec_out = 4'b1011;	// B
+						      4'b1101 :	dec_out = 4'b1100;	// C
+						      4'b1110 :	dec_out = 4'b1101;	// D
+						  endcase      
+					end
+		endcase
+
+endmodule
+
+module seg7_control(
+    input [3:0] dec,        // from decoder
+    output [3:0] an,        // anodes
+    output reg [6:0] seg    // cathodes
+    );
+
+	assign an = 4'b1110;   // only using far right digit
+
+    // segment patterns based on decoder value
+	always @(dec) begin
+		case (dec)       // gfedcba  <-- segment order
+			4'h0 : seg = 7'b1000000;   // 0
+			4'h1 : seg = 7'b1111001;   // 1
+			4'h2 : seg = 7'b0100100;   // 2
+			4'h3 : seg = 7'b0110000;   // 3
+			4'h4 : seg = 7'b0011001;   // 4
+			4'h5 : seg = 7'b0010010;   // 5
+			4'h6 : seg = 7'b0000010;   // 6
+			4'h7 : seg = 7'b1111000;   // 7
+			4'h8 : seg = 7'b0000000;   // 8
+			4'h9 : seg = 7'b0010000;   // 9
+			4'hA : seg = 7'b0001000;   // A
+			4'hB : seg = 7'b0000000;   // B
+			4'hC : seg = 7'b1000110;   // C
+			4'hD : seg = 7'b1000000;   // D
+			4'hE : seg = 7'b0000110;   // E
+			4'hF : seg = 7'b0001110;   // F	
+		endcase
+	end
+
+endmodule
+
+//xdc code
+# Clock signal
+set_property PACKAGE_PIN W5 [get_ports clk_100MHz]							
+	set_property IOSTANDARD LVCMOS33 [get_ports clk_100MHz]
+	create_clock -add -name sys_clk_pin -period 10.00 -waveform {0 5} [get_ports clk_100MHz]
+	
+#7 segment display
+set_property PACKAGE_PIN W7 	 [get_ports {seg[0]}]					
+set_property IOSTANDARD LVCMOS33 [get_ports {seg[0]}]
+set_property PACKAGE_PIN W6 	 [get_ports {seg[1]}]					
+set_property IOSTANDARD LVCMOS33 [get_ports {seg[1]}]
+set_property PACKAGE_PIN U8 	 [get_ports {seg[2]}]					
+set_property IOSTANDARD LVCMOS33 [get_ports {seg[2]}]
+set_property PACKAGE_PIN V8 	 [get_ports {seg[3]}]					
+set_property IOSTANDARD LVCMOS33 [get_ports {seg[3]}]
+set_property PACKAGE_PIN U5 	 [get_ports {seg[4]}]					
+set_property IOSTANDARD LVCMOS33 [get_ports {seg[4]}]
+set_property PACKAGE_PIN V5 	 [get_ports {seg[5]}]					
+set_property IOSTANDARD LVCMOS33 [get_ports {seg[5]}]
+set_property PACKAGE_PIN U7 	 [get_ports {seg[6]}]					
+set_property IOSTANDARD LVCMOS33 [get_ports {seg[6]}]
+
+set_property PACKAGE_PIN U2 	 [get_ports {an[0]}]					
+set_property IOSTANDARD LVCMOS33 [get_ports {an[0]}]
+set_property PACKAGE_PIN U4 	 [get_ports {an[1]}]					
+set_property IOSTANDARD LVCMOS33 [get_ports {an[1]}]
+set_property PACKAGE_PIN V4 	 [get_ports {an[2]}]					
+set_property IOSTANDARD LVCMOS33 [get_ports {an[2]}]
+set_property PACKAGE_PIN W4 	 [get_ports {an[3]}]					
+set_property IOSTANDARD LVCMOS33 [get_ports {an[3]}]
+
+##Pmod Header JB
+##Sch name = JB1
+set_property PACKAGE_PIN A14 	 [get_ports {cols[0]}]					
+set_property IOSTANDARD LVCMOS33 [get_ports {cols[0]}]
+##Sch name = JB2                            
+set_property PACKAGE_PIN A16 	 [get_ports {cols[1]}]					
+set_property IOSTANDARD LVCMOS33 [get_ports {cols[1]}]
+##Sch name = JB3                            
+set_property PACKAGE_PIN B15 	 [get_ports {cols[2]}]					
+set_property IOSTANDARD LVCMOS33 [get_ports {cols[2]}]
+##Sch name = JB4                             
+set_property PACKAGE_PIN B16 	 [get_ports {cols[3]}]					
+set_property IOSTANDARD LVCMOS33 [get_ports {cols[3]}]
+##Sch name = JB7
+set_property PACKAGE_PIN A15 	 [get_ports {rows[0]}]					
+set_property IOSTANDARD LVCMOS33 [get_ports {rows[0]}]
+##Sch name = JB8                            
+set_property PACKAGE_PIN A17 	 [get_ports {rows[1]}]					
+set_property IOSTANDARD LVCMOS33 [get_ports {rows[1]}]
+##Sch name = JB9                             
+set_property PACKAGE_PIN C15 	 [get_ports {rows[2]}]					
+set_property IOSTANDARD LVCMOS33 [get_ports {rows[2]}]
+##Sch name = JB10                             
+set_property PACKAGE_PIN C16 	 [get_ports {rows[3]}]					
+set_property IOSTANDARD LVCMOS33 [get_ports {rows[3]}]
